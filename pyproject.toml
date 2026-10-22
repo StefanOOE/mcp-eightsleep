@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-eightsleep"
+version = "0.1.0"
+description = "Read-only MCP server for Eight Sleep sleep data (scores, stages, HRV, heart and respiratory rate, temperatures)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "StefanOOE" }]
+keywords = ["mcp", "model-context-protocol", "eight-sleep", "sleep", "hrv"]
+dependencies = ["mcp>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+mcp-eightsleep = "mcp_eightsleep.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_eightsleep"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
