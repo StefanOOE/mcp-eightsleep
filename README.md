@@ -1,46 +1,103 @@
 # mcp-eightsleep
 
-Read-only MCP server (stdio) for the sleep data of an Eight Sleep mattress cover: one night as
-ready-made text that an agent can quote instead of copying values out of JSON.
+A small, **read-only** [Model Context Protocol](https://modelcontextprotocol.io) server (stdio)
+for the sleep data of an [Eight Sleep](https://www.eightsleep.com) mattress cover.
 
-| Tool | What it returns |
+It returns one night as **ready-made text** - scores, times, stages, HRV, heart and respiratory
+rate against your own averages, bed and room temperature - so an agent can quote the numbers
+instead of digging them out of a large JSON document (and mixing them up). Built for a daily
+morning check-in, next to data from a sports watch.
+
+> **Unofficial.** This project is not affiliated with or endorsed by Eight Sleep. Eight Sleep
+> publishes no developer API; see [How it works](#how-it-works) and use it at your own risk.
+
+## Tool
+
+### `get_night(target_date?, history_days=0)`
+
+| Parameter | Meaning |
 |---|---|
-| `get_night(target_date?, history_days=0)` | Sleep fitness score (quality/routine), time in bed and asleep, time to fall asleep, sleep duration vs. your average and sleep need, stages, wake-ups, HRV, heart rate and respiratory rate (each with your average, 7-day average and score), bed and room temperature, snoring. `target_date` is the day you woke up (default today); `history_days` adds one line per earlier night. |
+| `target_date` | `YYYY-MM-DD`, the day you **woke up** ("last night" = today, the default) |
+| `history_days` | `0`-`13`: one short line per earlier night |
 
-It cannot change anything on the bed (no temperature, alarm or base control).
+Example output (made-up numbers):
 
-## Caveat
+```
+# Eight Sleep night (woke up Thu 22.10)
+Sleep fitness score 78: quality 80, routine 70
+In bed 21:40-06:58, asleep 22:05-06:50, fell asleep in 0h15
+Sleep 7h45 (your avg 7h20, 7-day 7h30, score 85/100); sleep need 7h30, sleep debt 0h45
+Stages: deep 1h30 (19%), REM 1h40 (21%), light 4h35; awake after falling asleep 0h25, 3 wake-ups
+HRV 42 ms (your avg 40, 7-day 41, score 80/100)
+Heart rate 55 bpm (your avg 56, 7-day 56, score 75/100)
+Respiratory rate 14.2/min (your avg 14.5, 7-day 14.4, score 90/100)
+Temperature: bed 26.1-28.4 °C, room 19.5-20.3 °C
+Snoring 0h12 (3%)
+## Nights before (1 with data)
+- Tue 20.10: score 70, sleep 7h00, deep 1h20, HRV 39 ms, HR 58 bpm
+```
 
-Eight Sleep has no public developer API. This server uses the app's API with the client id
-that the Home Assistant community integration uses, and a password login. It may break when
-Eight Sleep changes its app, and accounts that sign in with Apple/Google need a password set
-in the app first. Keep the call rate low (one call per check-in is plenty).
+Times are shown in the time zone of your device (or `EIGHTSLEEP_TIMEZONE`). A night without
+data (away, other side of the bed, not processed yet) is named as such, not skipped.
+
+The server cannot change anything: no temperature, alarm, base or away-mode control.
 
 ## Setup
 
+Requires Python 3.10+.
+
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -e .
+git clone https://github.com/StefanOOE/mcp-eightsleep.git
+cd mcp-eightsleep
+python3 -m venv .venv && .venv/bin/pip install .
 ```
 
-Environment:
-
-| Variable | Meaning |
+| Environment variable | Meaning |
 |---|---|
-| `EIGHTSLEEP_EMAIL`, `EIGHTSLEEP_PASSWORD` | account login (required) |
-| `EIGHTSLEEP_TIMEZONE` | optional, default: the time zone of your device |
+| `EIGHTSLEEP_EMAIL`, `EIGHTSLEEP_PASSWORD` | your Eight Sleep login (required) |
+| `EIGHTSLEEP_TIMEZONE` | optional IANA time zone, default: the one of your device |
 
-MCP client config:
+Accounts that sign in with Apple or Google need a password set in the Eight Sleep app first.
+
+MCP client configuration (e.g. Claude Desktop, Claude Code or any other MCP client):
 
 ```json
-{"mcpServers": {"mcp-eightsleep": {
-  "command": "/path/to/mcp-eightsleep/.venv/bin/python", "args": ["-m", "mcp_eightsleep"],
-  "env": {"EIGHTSLEEP_EMAIL": "you@example.com", "EIGHTSLEEP_PASSWORD": "..."}}}}
+{
+  "mcpServers": {
+    "mcp-eightsleep": {
+      "command": "/path/to/mcp-eightsleep/.venv/bin/python",
+      "args": ["-m", "mcp_eightsleep"],
+      "env": {"EIGHTSLEEP_EMAIL": "you@example.com", "EIGHTSLEEP_PASSWORD": "..."}
+    }
+  }
+}
 ```
 
-## Tests
+Keep the password out of shared config files - pass it from a secret store or an `.env` that
+your MCP client expands.
+
+## How it works
+
+- Login: OAuth password grant against `auth-api.8slp.net`, with the client id/secret of the
+  Eight Sleep Android app as used by the community
+  [Home Assistant integration](https://github.com/lukas-clarke/eight_sleep). The token is kept
+  in memory, renewed before it expires, and once more after a `401`.
+- Data: `GET client-api.8slp.net/v1/users/{id}/trends` (model version `v2`) for the requested
+  days - one record per night, filed under the day you woke up.
+- Only the Python standard library plus the `mcp` SDK; no data is stored on disk.
+
+Because the API is private, it can change without notice. Keep the call rate low - one call
+per check-in is plenty.
+
+## Development
 
 ```bash
-.venv/bin/pip install -e '.[dev]' && .venv/bin/python -m pytest -q
+.venv/bin/pip install -e '.[dev]'
+.venv/bin/python -m pytest -q
 ```
 
-License: MIT
+The tests use a fake HTTP layer and a fake client - no account or network needed.
+
+## License
+
+[MIT](LICENSE)
