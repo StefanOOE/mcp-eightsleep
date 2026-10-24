@@ -88,10 +88,10 @@ class Client:
         return self._profile
 
     def timezone(self) -> str:
-        """The override, else the device's time zone."""
+        """The `EIGHTSLEEP_TIMEZONE` override, else the device's time zone, else "UTC"."""
         return (config.timezone()
                 or (self.profile().get("currentDevice") or {}).get("timeZone")
-                or "Europe/Vienna")
+                or "UTC")
 
     def nights(self, first: date, last: date) -> list[dict]:
         """Per-night trend records ('day' = the day the user woke up), oldest first."""

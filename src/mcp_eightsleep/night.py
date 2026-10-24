@@ -80,8 +80,9 @@ def night_lines(night: dict, tz: ZoneInfo) -> list[str]:
         f"7-day {hm(duration.get('inclusive7DayAverage'))}, score {duration.get('score', '-')}/100)"
         + _need(debt),
         f"Stages: deep {hm(night.get('deepDuration'))} "
-        f"({round(night.get('deepPercent', 0) * 100)}%),"
-        f" REM {hm(night.get('remDuration'))} ({round(night.get('remPercent', 0) * 100)}%), light "
+        f"({round((night.get('deepPercent') or 0) * 100)}%),"
+        f" REM {hm(night.get('remDuration'))} "
+        f"({round((night.get('remPercent') or 0) * 100)}%), light "
         f"{hm(night.get('lightDuration'))}; awake after falling asleep "
         f"{hm(night.get('wasoDuration'))}, {night.get('wakeupCount', '-')} wake-ups",
         f"HRV {_vs(_metric(night, 'hrv'), ' ms')}",
