@@ -42,9 +42,12 @@ class FakeClient:
         self.asked = None
         self.error = None
         self.time_zone = "Europe/Vienna"
+        self.timezone_error = None
 
     def timezone(self):
-        """The configured time zone (possibly not a real one)."""
+        """The configured time zone (possibly not a real one), or the configured failure."""
+        if self.timezone_error is not None:
+            raise self.timezone_error
         return self.time_zone
 
     def nights(self, first, last):
@@ -125,3 +128,14 @@ def test_api_error_keeps_its_message(fake):
     fake.error = EightSleepError("Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD.")
     with pytest.raises(ToolError, match="Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD."):
         server.get_night("2026-10-22")
+
+
+def test_time_zone_lookup_error_keeps_its_message(fake):
+    """A profile call that fails (login needed) reaches the caller with the client's text.
+
+    `timezone()` is itself an API call, so it can raise before the night is fetched.
+    """
+    fake.timezone_error = EightSleepError("Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD.")
+    with pytest.raises(ToolError, match="Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD."):
+        server.get_night("2026-10-22")
+    assert fake.asked is None
