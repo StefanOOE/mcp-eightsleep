@@ -1,5 +1,7 @@
 # mcp-eightsleep
 
+[![CI](https://github.com/StefanOOEOrg/mcp-eightsleep/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanOOEOrg/mcp-eightsleep/actions/workflows/ci.yml)
+
 A small, **read-only** [Model Context Protocol](https://modelcontextprotocol.io) server (stdio)
 for the sleep data of an [Eight Sleep](https://www.eightsleep.com) mattress cover.
 
@@ -44,11 +46,12 @@ The server cannot change anything: no temperature, alarm, base or away-mode cont
 
 ## Setup
 
-Requires Python 3.10+.
+Requires **Python 3.10 or newer** (the CI runs 3.10 and 3.14).
 
 ```bash
-git clone https://github.com/StefanOOE/mcp-eightsleep.git
+git clone https://github.com/StefanOOEOrg/mcp-eightsleep.git
 cd mcp-eightsleep
+cp .env.template .env      # fill in EIGHTSLEEP_EMAIL / EIGHTSLEEP_PASSWORD
 python3 -m venv .venv && .venv/bin/pip install .
 ```
 
@@ -89,14 +92,52 @@ your MCP client expands.
 Because the API is private, it can change without notice. Keep the call rate low - one call
 per check-in is plenty.
 
+## Project structure
+
+```
+mcp-eightsleep/
+├── src/mcp_eightsleep/
+│   ├── __init__.py
+│   ├── __main__.py          # python -m mcp_eightsleep
+│   ├── client.py            # login, token renewal, profile, per-night trends
+│   ├── config.py            # EIGHTSLEEP_* from the environment
+│   ├── night.py             # one night as pre-formatted lines
+│   └── server.py            # the MCP tool get_night + main()
+├── tests/
+│   ├── test_client.py       # login once, renewal after 401, time zone order
+│   ├── test_night.py        # formatting, history, ToolError paths
+│   └── test_server.py       # start without credentials: one hint, still runs
+├── .github/workflows/ci.yml # pytest + pylint on 3.10 and 3.14
+├── .env.template            # copy to .env, fill in the login
+├── CHANGELOG.md
+├── LICENSE
+├── pyproject.toml
+└── README.md
+```
+
 ## Development
 
 ```bash
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/python -m pytest -q
+.venv/bin/python -m pylint src tests    # lint gate, must stay clean
 ```
 
 The tests use a fake HTTP layer and a fake client - no account or network needed.
+
+## Scope / Limitations
+
+- A single-user tool, not a service: it runs locally over stdio - no network port, no
+  authentication, no multi-user support.
+- Read-only by design: it reads scores and metrics, nothing can be changed (no temperature,
+  alarm, base or away-mode control).
+- It talks to the private Eight Sleep app API through reverse-engineered endpoints (see
+  [How it works](#how-it-works)); that API can change or break at any time.
+- Credentials are stored in plain text in your client config or `.env` - keep them out of
+  shared files and out of logs.
+- Accounts that sign in with Apple or Google need a password set in the Eight Sleep app first.
+- `EIGHTSLEEP_TIMEZONE` is only needed when the account reports no device time zone; the
+  fallback then is `UTC`.
 
 ## License
 
