@@ -1,12 +1,14 @@
 """MCP server: read-only Eight Sleep sleep data as pre-formatted text."""
 from __future__ import annotations
 
+import sys
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
+from . import config
 from .client import Client, EightSleepError
 from .night import day_label, night_lines, short_line
 
@@ -75,11 +77,11 @@ def get_night(target_date: str | None = None, history_days: int = 0) -> str:
 
 
 def main() -> None:
-    """Run the server on stdio."""
-    try:
-        mcp.run()
-    except EightSleepError as exc:   # pragma: no cover - only on startup failures
-        raise SystemExit(str(exc)) from None
+    """Run the server on stdio, warning on stderr when the login is not configured."""
+    if not config.email() or not config.password():
+        print("mcp-eightsleep: EIGHTSLEEP_EMAIL/EIGHTSLEEP_PASSWORD not set - "
+              "get_night will fail", file=sys.stderr)
+    mcp.run()
 
 
 if __name__ == "__main__":

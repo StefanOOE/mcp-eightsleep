@@ -66,3 +66,33 @@ def test_missing_login_is_a_clear_error(monkeypatch):
     monkeypatch.delenv("EIGHTSLEEP_EMAIL", raising=False)
     with pytest.raises(EightSleepError, match="EIGHTSLEEP_EMAIL"):
         Client().nights(date(2026, 10, 21), date(2026, 10, 22))
+
+
+class NoZoneResponses(Responses):  # pylint: disable=too-few-public-methods
+    """A profile without a device time zone."""
+
+    def __call__(self, request, timeout):
+        if request.full_url.endswith("/users/me"):
+            return io.BytesIO(json.dumps({"user": {"currentDevice": {"side": "left"}}}).encode())
+        return super().__call__(request, timeout)
+
+
+def test_time_zone_override_wins(monkeypatch):
+    """EIGHTSLEEP_TIMEZONE beats the device - no request needed."""
+    monkeypatch.setenv("EIGHTSLEEP_TIMEZONE", "Asia/Tokyo")
+
+    assert Client().timezone() == "Asia/Tokyo"
+
+
+def test_time_zone_uses_the_device_zone(monkeypatch, login):  # pylint: disable=unused-argument
+    """Without an override the device's own zone is used."""
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", Responses())
+
+    assert Client().timezone() == "Europe/Vienna"
+
+
+def test_time_zone_falls_back_to_utc(monkeypatch, login):  # pylint: disable=unused-argument
+    """No override and no device zone: UTC, not a hard-coded European zone."""
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", NoZoneResponses())
+
+    assert Client().timezone() == "UTC"

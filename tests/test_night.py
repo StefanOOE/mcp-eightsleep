@@ -139,3 +139,12 @@ def test_time_zone_lookup_error_keeps_its_message(fake):
     with pytest.raises(ToolError, match="Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD."):
         server.get_night("2026-10-22")
     assert fake.asked is None
+
+
+def test_null_percentages_render_as_zero(fake):
+    """A night that reports null deep/rem percentages shows 0 %, not a TypeError."""
+    fake.all = [{**NIGHT, "deepPercent": None, "remPercent": None}]
+
+    text = server.get_night("2026-10-22")
+
+    assert "Stages: deep 1h30 (0%), REM 1h40 (0%), light 4h35" in text
