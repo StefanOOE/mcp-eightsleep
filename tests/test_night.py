@@ -1,9 +1,12 @@
-"""get_night against a fake client: formatting, missing nights, history."""
+"""get_night against a fake client: formatting, missing nights, history, error messages."""
+import asyncio
 from datetime import date
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 from mcp_eightsleep import server
+from mcp_eightsleep.client import EightSleepError
 
 
 def _metric(current, average, week, score):
@@ -37,13 +40,20 @@ class FakeClient:
     def __init__(self, nights):
         self.all = nights
         self.asked = None
+        self.error = None
+        self.time_zone = "Europe/Vienna"
+        self.timezone_error = None
 
     def timezone(self):
-        """Fixed time zone."""
-        return "Europe/Vienna"
+        """The configured time zone (possibly not a real one), or the configured failure."""
+        if self.timezone_error is not None:
+            raise self.timezone_error
+        return self.time_zone
 
     def nights(self, first, last):
-        """The nights in [first, last]."""
+        """The nights in [first, last], or the configured failure."""
+        if self.error is not None:
+            raise self.error
         self.asked = (first, last)
         return [n for n in self.all if first.isoformat() <= n["day"] <= last.isoformat()]
 
@@ -81,3 +91,51 @@ def test_history_and_missing_night(fake):
     assert "No Eight Sleep data for this night" in text
     assert text.endswith("## Nights before (1 with data)\n"
                          "- Tue 20.10: score 70, sleep 7h00, deep 1h20, HRV 39 ms, HR 58 bpm")
+
+
+def test_tool_is_registered():
+    """Exactly one tool, named get_night - the name an agent has to call."""
+    tools = asyncio.run(server.mcp.list_tools())
+    assert [tool.name for tool in tools] == ["get_night"]
+
+
+def test_invalid_target_date_is_a_tool_error(fake):
+    """A non-date target_date is explained, before any API call is made."""
+    with pytest.raises(
+            ToolError, match="target_date must be a date as YYYY-MM-DD, got 'yesterday'"):
+        server.get_night("yesterday")
+    assert fake.asked is None
+
+
+def test_invalid_history_days_is_a_tool_error(fake):
+    """A non-numeric history_days is explained, before any API call is made."""
+    with pytest.raises(
+            ToolError, match="history_days must be a whole number 0-13, got 'drei'"):
+        server.get_night("2026-10-22", history_days="drei")  # type: ignore[arg-type]
+    assert fake.asked is None
+
+
+def test_unknown_time_zone_is_a_tool_error(fake):
+    """A time zone the system does not know is named, before any API call is made."""
+    fake.time_zone = "Mars/Olympus"
+    with pytest.raises(ToolError, match="Mars/Olympus is not a known time zone"):
+        server.get_night("2026-10-22")
+    assert fake.asked is None
+
+
+def test_api_error_keeps_its_message(fake):
+    """A login or API failure reaches the caller with the client's own text."""
+    fake.error = EightSleepError("Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD.")
+    with pytest.raises(ToolError, match="Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD."):
+        server.get_night("2026-10-22")
+
+
+def test_time_zone_lookup_error_keeps_its_message(fake):
+    """A profile call that fails (login needed) reaches the caller with the client's text.
+
+    `timezone()` is itself an API call, so it can raise before the night is fetched.
+    """
+    fake.timezone_error = EightSleepError("Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD.")
+    with pytest.raises(ToolError, match="Set EIGHTSLEEP_EMAIL and EIGHTSLEEP_PASSWORD."):
+        server.get_night("2026-10-22")
+    assert fake.asked is None

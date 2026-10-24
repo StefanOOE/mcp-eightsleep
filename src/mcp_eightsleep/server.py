@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from .client import Client, EightSleepError
 from .night import day_label, night_lines, short_line
@@ -28,11 +29,37 @@ def get_night(target_date: str | None = None, history_days: int = 0) -> str:
     the user's average, 7-day average and score), bed/room temperature. `target_date`
     (YYYY-MM-DD) is the day the user WOKE UP - 'last night' = today (default).
     `history_days` (0-13) adds one short line per earlier night. Quote the numbers as they are."""
-    tz = ZoneInfo(_client.timezone())
-    woke = date.fromisoformat(target_date) if target_date else datetime.now(tz).date()
-    history_days = max(0, min(int(history_days), 13))
-    nights = {night.get("day"): night
-              for night in _client.nights(woke - timedelta(days=history_days), woke)}
+    if target_date is not None:
+        try:
+            woke = date.fromisoformat(target_date)
+        except ValueError:
+            raise ToolError(
+                f"target_date must be a date as YYYY-MM-DD, got {target_date!r}") from None
+    else:
+        woke = None
+    try:
+        history_days = int(history_days)
+    except (TypeError, ValueError):
+        raise ToolError(
+            f"history_days must be a whole number 0-13, got {history_days!r}") from None
+    history_days = max(0, min(history_days, 13))
+    try:
+        zone = _client.timezone()
+    except EightSleepError as exc:
+        raise ToolError(str(exc)) from None
+    try:
+        tz = ZoneInfo(zone)
+    except ZoneInfoNotFoundError:
+        raise ToolError(
+            f"{zone} is not a known time zone "
+            "(set EIGHTSLEEP_TIMEZONE to an IANA name)") from None
+    if woke is None:
+        woke = datetime.now(tz).date()
+    try:
+        nights = {night.get("day"): night
+                  for night in _client.nights(woke - timedelta(days=history_days), woke)}
+    except EightSleepError as exc:
+        raise ToolError(str(exc)) from None
     night = nights.get(woke.isoformat())
     lines = [f"# Eight Sleep night (woke up {day_label(woke)})"]
     if night is None:
