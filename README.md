@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/StefanOOEOrg/mcp-eightsleep/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanOOEOrg/mcp-eightsleep/actions/workflows/ci.yml)
 [![M8ven Verified](https://m8ven.ai/badge/mcp/stefanooeorg-mcp-eightsleep-12r7ux?variant=verified)](https://m8ven.ai/mcp/stefanooeorg-mcp-eightsleep-12r7ux)
+[![M8ven Score](https://m8ven.ai/badge/mcp/stefanooeorg-mcp-eightsleep-12r7ux?v=485a7b236507d71c20099e7ef36b0d9b)](https://m8ven.ai/mcp/stefanooeorg-mcp-eightsleep-12r7ux?s=readme)
 
 A small, **read-only** [Model Context Protocol](https://modelcontextprotocol.io) server (stdio)
 for the sleep data of an [Eight Sleep](https://www.eightsleep.com) mattress cover.
